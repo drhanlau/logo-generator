@@ -1,63 +1,65 @@
 const express = require("express");
 const path = require("path");
-const { GoogleGenAI } = require("@google/genai");
+const { VertexAI } = require('@google-cloud/vertexai');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const { generateImage } = require('./image-fb');
+
 
 // Serve static files
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
-// POST /api/generate-logo
-app.post("/api/generate-logo", async (req, res) => {
-  const { company, industry, vibe, instructions } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY;
+const { initializeApp } = require("firebase/app");
+const { getVertexAI, getImagenModel } = require("firebase/vertexai");
 
-  if (!apiKey) {
-    return res.status(500).json({
-      error:
-        "Gemini API key not set. Please set GEMINI_API_KEY in your environment.",
-    });
-  }
+// TODO(developer) Replace the following with your app's Firebase configuration
+// See: https://firebase.google.com/docs/web/learn-more#config-object
+const firebaseConfig = {
+  apiKey: "AIzaSyATJ2xdBAWkwVQlx4NOTE1C7sC7H8as9jk",
+  authDomain: "cny2024-b23be.firebaseapp.com",
+  projectId: "cny2024-b23be",
+  storageBucket: "cny2024-b23be.firebasestorage.app",
+  messagingSenderId: "427696236819",
+  appId: "1:427696236819:web:f1faf6bdf8c6d70fae92e6"
+};
+// Initialize FirebaseApp
+const firebaseApp = initializeApp(firebaseConfig);
+
+// Initialize the Vertex AI service
+const vertexAI = getVertexAI(firebaseApp);
+
+// Create an `ImagenModel` instance with an Imagen 3 model that supports your use case
+
+// New Firebase-based logo generation endpoint
+app.post("/api/logo-fb", async (req, res) => {
+  const { company, industry, vibe, instructions } = req.body;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
-    // Construct prompt for Gemini
+    // Construct prompt
     const prompt = `Create a professional logo for a company named "${company}" in the "${industry}" industry. Vibe: ${vibe}. ${instructions}`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp-image-generation",
-      contents: prompt,
-      config: {
-        responseModalities: ["Text", "Image"],
-      },
+    // Generate the image
+    const image = await generateImage(prompt);
+
+    // Return the image data
+    res.json({
+      imageUrl: `data:image/png;base64,${image.bytesBase64Encoded}`,
+      // Include any additional metadata if available
+      metadata: image.metadata
     });
-
-    let imageData = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageData = part.inlineData.data;
-        break;
-      }
-    }
-
-    if (!imageData) {
-      return res
-        .status(500)
-        .json({ error: "No image generated from Gemini API." });
-    }
-
-    // Return the base64 image data
-    res.json({ imageUrl: `data:image/png;base64,${imageData}` });
   } catch (err) {
-    console.error("Error calling Gemini API:", err);
+    console.error("Error generating logo with Firebase:", err);
     res.status(500).json({
       error: `Failed to generate logo: ${err.message}`,
     });
   }
 });
+
 
 // Start server
 app.listen(PORT, () => {

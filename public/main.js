@@ -21,7 +21,7 @@ document
     };
 
     try {
-      const response = await fetch("/api/generate-logo", {
+      const response = await fetch("/api/logo-fb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
